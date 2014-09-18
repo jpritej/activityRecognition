@@ -1,0 +1,92 @@
+---
+title: "Human Activity Recognition"
+author: "Javier Prieto"
+date: "18 de septiembre de 2014"
+output: html_document
+---
+
+## Summary
+
+In this study, we predict the type of activity that 6 participans do based on data from accelerometers on their belt, forearm, arm, and dumbell. The use of random forest lead us to a near-optimal model that distinguishes between 5 activity classes achiving an accuracy greater than 99%
+
+## Cleaning and splitting the data
+
+The first step is to load the data and clean the invalid values. We remove the columns in which the given test data reports NAs values. We likewise remove the 6 first columns with variables non-useful for prediction. 
+
+```{r setoptions,echo=TRUE,results='hide',message=FALSE, warning=FALSE}
+library(caret)
+## Read training data
+data<-read.csv("pml-training.csv")
+## Read test data
+test<-read.csv("pml-testing.csv")
+## Remove first 7 columns with username, timestamps and so on
+test<-test[,8:ncol(test)]
+## Select only the columns with non-NA values in the test data
+test<-test[,names(test)[colSums(is.na(test))==0]]
+## Keep the same columns in the training set as in the test data
+data<-data[,c(names(test)[1:ncol(test)-1],"classe")]
+```
+
+After that, we split the data into the training and testing sets, with a proportion of 60% to 40%, respectively.
+
+
+```{r preparingData, message=FALSE, warning=FALSE}
+## Divide the training set into training and testing samples
+inTrain<-createDataPartition(y=data$classe,p=0.6,list=FALSE)
+training<-data[inTrain,] # Training samples
+testing<-data[-inTrain,] # Testing samples
+```
+
+## Training the model
+
+In this section, we apply the Breiman's randomForest algorithm to the training set.
+
+```{r fittingModel,results='hide',message=FALSE, warning=FALSE}
+## Set the seed to a fix value
+set.seed(125)
+## Load randomForest library
+library(randomForest)
+## Apply random Forest algorithm
+modFit<-randomForest(classe~.,data=training,proximity=TRUE)
+```
+
+## Validating the model
+
+In the following, we predict the class of activity from the obtained testing set based on the fitted model. Next, we check the accuracy achieved by means of the confusion matrix.
+
+```{r predicting,results='hold',message=FALSE, warning=FALSE}
+## Predict the classes in the testing set with the trained model
+pred<-predict(modFit,testing)
+## Evalute the results
+confusionMatrix(data=pred, testing$classe)
+```
+
+As we can appreciate in the results, the achieved accuracy in the testing set is greater than 99%. Next figure represents the error rate in logarithmic units.
+
+```{r plotResults,results='hide',message=FALSE, warning=FALSE}
+plot(modFit,log="y",main="Error rate in the fitted model")
+```
+
+## 20 test cases
+
+Finally, we apply the fitted model to the 20 test cases and save them in individual files by defining the function *pml_write_files*.
+
+```{r testCases,results='hold',message=FALSE, warning=FALSE}
+## Predict the classes in the 20 cases of the given test set
+answers<-predict(modFit,test)
+## Define function for project submission
+pml_write_files = function(x){
+n = length(x)
+for(i in 1:n){
+filename = paste0("problem_id_",i,".txt")
+write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+}
+}
+# Generate files to submit
+pml_write_files(answers)
+```
+
+
+## Conclusion
+
+Random forest algorithm is a good choice for predicting models with more than 2 classes and numerous predictors. Based on the given data we achieve an accuracy of 99%, correctly predicting the 20 test cases.
